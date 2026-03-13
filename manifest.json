@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "GitHub Hidden Comment Expander",
+  "version": "1.0.0",
+  "description": "Expand hidden GitHub issue or PR comments with one click.",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["https://github.ibm.com/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "GitHub Hidden Comment Expander",
+    "default_icon": "icons/icons_50.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://github.ibm.com/*/*/issues/*",
+        "https://github.ibm.com/*/*/pull/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "50": "icons/icons_50.png"
+  }
+}

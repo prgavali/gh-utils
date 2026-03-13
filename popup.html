@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>GitHub Hidden Comments</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 12px;
+      min-width: 260px;
+    }
+
+    h3 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    input {
+      width: 70px;
+      padding: 6px;
+    }
+
+    button {
+      padding: 8px 10px;
+      cursor: pointer;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    #status {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #444;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h3>GitHub Hidden Comments</h3>
+
+  <button id="expandAllBtn">Expand all comments</button>
+
+  <div class="row">
+    <label for="count">Last</label>
+    <input id="count" type="number" min="1" />
+  </div>
+
+  <button id="expandLastBtn">Expand last N comments</button>
+
+  <div id="status"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
