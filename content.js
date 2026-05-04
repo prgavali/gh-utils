@@ -1,5 +1,5 @@
 (() => {
-  const DEFAULT_WAIT_MS = 1200;
+  const DEFAULT_WAIT_MS = 2000;
   const DEFAULT_COUNT = 10;
   const PANEL_ID = "gh-comment-expander-panel";
   let isRunning = false;
@@ -36,7 +36,7 @@
 
     return elements.filter((el) => {
       if (!isVisible(el)) return false;
-      if (isInsideExtensionPanel(el)) return false; // important fix
+      if (isInsideExtensionPanel(el)) return false;
 
       const text = (el.textContent || "").trim().toLowerCase();
       const aria = (el.getAttribute("aria-label") || "").trim().toLowerCase();
@@ -47,31 +47,15 @@
       return (
         combined.includes("view more") ||
         combined.includes("load more") ||
-        combined.includes("show more") 
+        combined.includes("show more")
       );
     });
-  }
-
-  async function clickExpandElement(el) {
-    el.scrollIntoView({ block: "center", behavior: "smooth" });
-    await wait(250);
-    el.click();
-    await wait(DEFAULT_WAIT_MS);
   }
 
   function setStatus(message) {
     const el = document.getElementById("gh-comment-expander-status");
     if (el) el.textContent = message;
   }
-
-  function hidePanelIfNoHiddenBlocks() {
-  const panel = document.getElementById(PANEL_ID);
-  const hiddenBlocks = getExpandElements();
-
-  if (panel && hiddenBlocks.length === 0) {
-    panel.remove();
-  }
-}
 
   async function expandAll() {
     if (isRunning) {
@@ -84,7 +68,7 @@
 
     isRunning = true;
     let total = 0;
-    let safety = 200;
+    let safety = 100;
 
     try {
       setStatus("Expanding all...");
@@ -93,15 +77,22 @@
         const elements = getExpandElements();
         if (!elements.length) break;
 
-        const target = elements[elements.length - 1];
-        await clickExpandElement(target);
-        total++;
+        // Click ALL expand buttons
+        for (const el of elements) {
+          el.scrollIntoView({ block: "center" });
+          el.click();
+          total++;
+        }
+
         setStatus(`Expanded ${total} section(s)...`);
+
+        // Wait for GitHub to load new content
+        await wait(DEFAULT_WAIT_MS);
       }
 
       const msg = `Expanded ${total} hidden section(s).`;
       setStatus(msg);
-      hidePanelIfNoHiddenBlocks()
+
       return { ok: true, message: msg };
     } catch (err) {
       console.error("Expand all failed:", err);
@@ -131,16 +122,20 @@
         const elements = getExpandElements();
         if (!elements.length) break;
 
-        const target = elements[elements.length - 1];
-        await clickExpandElement(target);
+        const el = elements[elements.length - 1];
+
+        el.scrollIntoView({ block: "center" });
+        el.click();
+
         total++;
         setStatus(`Expanded ${total}/${count} section(s)...`);
+
+        await wait(DEFAULT_WAIT_MS);
       }
 
       const msg = `Expanded ${total} hidden section(s).`;
       setStatus(msg);
 
-      hidePanelIfNoHiddenBlocks()
       return { ok: true, message: msg };
     } catch (err) {
       console.error("Expand last N failed:", err);
@@ -174,9 +169,9 @@
     `;
 
     panel.innerHTML = `
-      <button id="gh-expand-all-btn" type="button" style="padding:6px 10px; cursor:pointer;">Expand all Commnets</button>
+      <button id="gh-expand-all-btn" style="padding:6px 10px;">Expand all Comments</button>
       <input id="gh-expand-count-input" type="number" min="1" value="${savedCount}" style="width:60px; padding:6px;" />
-      <button id="gh-expand-last-btn" type="button" style="padding:6px 10px; cursor:pointer;">Expand last N Sections</button>
+      <button id="gh-expand-last-btn" style="padding:6px 10px;">Expand last N</button>
       <span id="gh-comment-expander-status" style="max-width:220px; color:#57606a;"></span>
     `;
 
@@ -193,9 +188,7 @@
       await chrome.storage.sync.set({ expandCount: value });
     });
 
-    expandAllBtn.addEventListener("click", async () => {
-      await expandAll();
-    });
+    expandAllBtn.addEventListener("click", expandAll);
 
     expandLastBtn.addEventListener("click", async () => {
       let count = Number(countInput.value);
@@ -206,47 +199,25 @@
     });
   }
 
-async function injectPanel() {
-  if (!isIssueOrPrPage()) return;
-  if (document.getElementById(PANEL_ID)) return;
+  async function injectPanel() {
+    if (!isIssueOrPrPage()) return;
+    if (document.getElementById(PANEL_ID)) return;
 
-  // NEW: only show panel if hidden comments exist
-  const expandButtons = getExpandElements();
-  if (!expandButtons || expandButtons.length === 0) {
-    return;
+    const expandButtons = getExpandElements();
+    if (!expandButtons.length) return;
+
+    const saved = await chrome.storage.sync.get({ expandCount: DEFAULT_COUNT });
+    const savedCount = Number(saved.expandCount) || DEFAULT_COUNT;
+
+    createFloatingPanel(savedCount);
   }
 
-  const saved = await chrome.storage.sync.get({ expandCount: DEFAULT_COUNT });
-  const savedCount = Number(saved.expandCount) || DEFAULT_COUNT;
-
-  createFloatingPanel(savedCount);
-}
-
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (!message || !message.type) return;
-
-    if (message.type === "EXPAND_ALL_COMMENTS") {
-      expandAll().then(sendResponse);
-      return true;
-    }
-
-    if (message.type === "EXPAND_LAST_N_COMMENTS") {
-      const count = Number(message.count) || DEFAULT_COUNT;
-      expandLastN(count).then(sendResponse);
-      return true;
-    }
-  });
-
+  // Initial load
   if (isIssueOrPrPage()) {
     injectPanel();
   }
 
-  console.log("GitHub Hidden Comment Expander loaded on", location.href);
-})();
-
-if (isIssueOrPrPage()) {
-  injectPanel();
-
+  // Handle dynamic GitHub updates
   const observer = new MutationObserver(() => {
     const hasHidden = getExpandElements().length > 0;
     const panelExists = document.getElementById(PANEL_ID);
@@ -254,14 +225,12 @@ if (isIssueOrPrPage()) {
     if (hasHidden && !panelExists) {
       injectPanel();
     }
-
-    if (!hasHidden && panelExists) {
-      panelExists.remove();
-    }
   });
 
   observer.observe(document.body, {
     childList: true,
     subtree: true
   });
-}
+
+  console.log("GitHub Hidden Comment Expander loaded on", location.href);
+})();
